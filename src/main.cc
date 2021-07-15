@@ -1,6 +1,5 @@
 #include <napi.h>
 
-#include "buffer_finalizer.h"
 #include "keypress.h"
 #include "microsleep.h"
 #include "MMBitmap.h"
@@ -11,7 +10,6 @@
 
 int mouseDelay = 10;
 int keyboardDelay = 10;
-static BufferFinalizer<char> finalizer;
 
 /*
  __  __
@@ -241,12 +239,6 @@ Napi::Number _scrollMouse(const Napi::CallbackInfo &info)
 	microsleep(mouseDelay);
 
 	return Napi::Number::New(env, 1);
-}
-
-Napi::Number _theAnswer(const Napi::CallbackInfo &info) {
-	Napi::Env env = info.Env();
-
-	return Napi::Number::New(env, 42);
 }
 
 /*
@@ -761,8 +753,8 @@ Napi::Object _captureScreen(const Napi::CallbackInfo &info)
 		throw Napi::Error::New(env, "Error: Failed to capture screen");
 	}
 
-	uint32_t bufferSize = (uint32_t)(bitmap->bytewidth * bitmap->height);
-	Napi::Buffer<char> buffer = Napi::Buffer<char>::New(env, (char *)bitmap->imageBuffer, bufferSize, finalizer);
+	uint64_t bufferSize = bitmap->bytewidth * bitmap->height;
+	Napi::Buffer<char> buffer = Napi::Buffer<char>::Copy(env, (char *)bitmap->imageBuffer, bufferSize);
 
 	Napi::Object obj = Napi::Object::New(env);
 	obj.Set(Napi::String::New(env, "width"), Napi::Number::New(env, (double)bitmap->width));
@@ -772,12 +764,12 @@ Napi::Object _captureScreen(const Napi::CallbackInfo &info)
 	obj.Set(Napi::String::New(env, "bytesPerPixel"), Napi::Number::New(env, bitmap->bytesPerPixel));
 	obj.Set(Napi::String::New(env, "image"), buffer);
 
+	destroyMMBitmap(bitmap);
+
 	return obj;
 }
 
 Napi::Object Init(Napi::Env env, Napi::Object exports) {
-	exports.Set(Napi::String::New(env, "theAnswer"), Napi::Function::New(env, _theAnswer));
-
 	exports.Set(Napi::String::New(env, "dragMouse"), Napi::Function::New(env, _dragMouse));
 	exports.Set(Napi::String::New(env, "moveMouse"), Napi::Function::New(env, _moveMouse));
 	exports.Set(Napi::String::New(env, "getMousePos"), Napi::Function::New(env, _getMousePos));
